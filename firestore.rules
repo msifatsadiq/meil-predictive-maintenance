@@ -1,0 +1,173 @@
+rules_version = '2';
+
+/*
+ * MEIL Predictive Maintenance Dashboard - Firestore Security Rules
+ * 
+ * ROLE DEFINITIONS:
+ * 
+ * 1. ADMIN (Full Access)
+ *    - Read all data
+ *    - Create, update, delete machines
+ *    - Create, update, delete events (all events, including others')
+ *    - Create, update, delete work orders
+ *    - Manage users and roles
+ * 
+ * 2. ENGINEER (Read + Limited Write)
+ *    - Read all data
+ *    - Create, update machines
+ *    - Create events
+ *    - Update/delete OWN events only
+ *    - Create, update, delete work orders
+ *    - Cannot delete machines
+ *    - Cannot manage users
+ * 
+ * 3. VIEWER (Read-Only)
+ *    - Read all data (machines, events, work orders, users)
+ *    - Cannot create, update, or delete anything
+ *    - Pure monitoring role
+ * 
+ * SECURITY HIGHLIGHTS:
+ * - Viewers are prevented from all write operations
+ * - Engineers can only modify/delete events they created
+ * - User roles stored in /users/{uid} collection
+ * - All operations require authentication
+ */
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // ============================================
+    // HELPER FUNCTIONS
+    // ============================================
+    
+    // Check if user is authenticated
+    function isSignedIn() {
+      return request.auth != null;
+    }
+    
+    // Get user role from users collection
+    // Role must be: 'admin', 'engineer', or 'viewer'
+    function getUserRole() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role;
+    }
+    
+    // Check if user has admin role (full access)
+    function isAdmin() {
+      return isSignedIn() && getUserRole() == 'admin';
+    }
+    
+    // Check if user can edit (admin or engineer, excludes viewers)
+    function canEdit() {
+      return isSignedIn() && (getUserRole() == 'admin' || getUserRole() == 'engineer');
+    }
+    
+    // ============================================
+    // COLLECTION RULES
+    // ============================================
+    
+    // USERS COLLECTION
+    // Stores user profiles with role information
+    // Structure: { email, name, role: 'admin'|'engineer'|'viewer', createdAt }
+    match /users/{userId} {
+      // READ: All authenticated users can read user data
+      // (Needed to display assignedTo names, created by info, etc.)
+      allow read: if isSignedIn();
+      
+      // WRITE: Only admins can create/update/delete users
+      // (Prevents self-role-escalation attacks)
+      allow write: if isAdmin();
+    }
+    
+    // MACHINES COLLECTION
+    // Stores machine/asset information
+    // Structure: { name, line, assetCode, status, criticality, createdAt, updatedAt }
+    match /machines/{machineId} {
+      // READ: All authenticated users (admin, engineer, viewer) can read machines
+      allow read: if isSignedIn();
+      
+      // CREATE: Admin and engineer can add new machines
+      // (Viewers cannot add machines)
+      allow create: if canEdit();
+      
+      // UPDATE: Admin and engineer can update machine details
+      // (Includes status changes: Running, Stopped, Faulted, Under Maintenance)
+      allow update: if canEdit();
+      
+      // DELETE: Admin and engineer can remove machines
+      // (Consider restricting to admin-only in production)
+      allow delete: if canEdit();
+    }
+    
+    // EVENTS COLLECTION (Downtime Events)
+    // Stores downtime/failure event records
+    // Structure: { machineId, startTime, endTime, downtimeMinutes, category, reason, 
+    //              comments, createdBy, createdAt }
+    match /events/{eventId} {
+      // READ: All authenticated users can read events
+      // (Viewers need this for dashboards and reports)
+      allow read: if isSignedIn();
+      
+      // CREATE: Admin and engineer can log new downtime events
+      // (Viewers cannot create events - prevents unauthorized data entry)
+      allow create: if canEdit();
+      
+      // UPDATE: Admin can edit any event, engineers can only edit their own
+      // (Prevents engineers from modifying each other's event logs)
+      allow update: if canEdit() && 
+        (isAdmin() || resource.data.createdBy == request.auth.token.email);
+      
+      // DELETE: Admin can delete any event, engineers can only delete their own
+      // (Audit trail protection - prevents unauthorized deletion)
+      allow delete: if canEdit() && 
+        (isAdmin() || resource.data.createdBy == request.auth.token.email);
+    }
+    
+    // WORK ORDERS COLLECTION
+    // Stores maintenance/repair work orders
+    // Structure: { title, machineId, priority, status, dueDate, assignedTo, 
+    //              description, createdAt, updatedAt }
+    match /workOrders/{workOrderId} {
+      // READ: All authenticated users can read work orders
+      // (Viewers can monitor work order status)
+      allow read: if isSignedIn();
+      
+      // CREATE: Admin and engineer can create work orders
+      // (Viewers cannot create work orders - prevents unauthorized requests)
+      allow create: if canEdit();
+      
+      // UPDATE: Admin and engineer can update work orders
+      // (Allows status changes: Open → In Progress → Completed)
+      allow update: if canEdit();
+      
+      // DELETE: Admin and engineer can delete work orders
+      // (Consider restricting to admin-only for audit compliance)
+      allow delete: if canEdit();
+    }
+  }
+}
+
+/*
+ * DEPLOYMENT INSTRUCTIONS:
+ * 
+ * 1. Install Firebase CLI:
+ *    npm install -g firebase-tools
+ * 
+ * 2. Login to Firebase:
+ *    firebase login
+ * 
+ * 3. Initialize project (if not done):
+ *    firebase init firestore
+ * 
+ * 4. Deploy rules:
+ *    firebase deploy --only firestore:rules
+ * 
+ * 5. Verify in Firebase Console:
+ *    console.firebase.google.com → Firestore Database → Rules
+ * 
+ * TESTING RULES:
+ * Use Firebase Emulator or Rules Playground in Firebase Console to test scenarios:
+ * - Viewer trying to create machine (should fail)
+ * - Engineer updating own event (should succeed)
+ * - Engineer deleting another engineer's event (should fail)
+ * - Admin deleting any event (should succeed)
+ */

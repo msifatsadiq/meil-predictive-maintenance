@@ -1,0 +1,95 @@
+{
+  "sampleMachines": [
+    {
+      "name": "Conveyor Motor A1",
+      "line": "Line A",
+      "assetCode": "MTR-001",
+      "status": "Running",
+      "criticality": "High"
+    },
+    {
+      "name": "Hydraulic Press B2",
+      "line": "Line B",
+      "assetCode": "HYD-002",
+      "status": "Running",
+      "criticality": "High"
+    },
+    {
+      "name": "CNC Machine C3",
+      "line": "Line C",
+      "assetCode": "CNC-003",
+      "status": "Under Maintenance",
+      "criticality": "Medium"
+    }
+  ],
+  "sampleEvents": [
+    {
+      "machineId": "<machine-id>",
+      "startTime": "2025-11-10T08:30:00",
+      "endTime": "2025-11-10T10:15:00",
+      "category": "Mechanical",
+      "reason": "Belt misalignment",
+      "comments": "Adjusted belt tension and alignment",
+      "createdBy": "engineer@meil.com"
+    },
+    {
+      "machineId": "<machine-id>",
+      "startTime": "2025-11-12T14:00:00",
+      "endTime": "2025-11-12T15:30:00",
+      "category": "Electrical",
+      "reason": "Sensor malfunction",
+      "comments": "Replaced faulty sensor",
+      "createdBy": "engineer@meil.com"
+    }
+  ],
+  "sampleWorkOrders": [
+    {
+      "title": "Replace conveyor belt",
+      "machineId": "<machine-id>",
+      "priority": "High",
+      "status": "Open",
+      "dueDate": "2025-11-20",
+      "assignedTo": "John Engineer",
+      "description": "Belt showing signs of wear, schedule replacement"
+    },
+    {
+      "title": "Hydraulic system inspection",
+      "machineId": "<machine-id>",
+      "priority": "Medium",
+      "status": "In Progress",
+      "dueDate": "2025-11-18",
+      "assignedTo": "Mike Smith",
+      "description": "Routine quarterly inspection"
+    }
+  ],
+  "categories": [
+    "Mechanical",
+    "Electrical",
+    "Breakdown",
+    "Planned Maintenance",
+    "Other"
+  ],
+  "statuses": {
+    "machines": [
+      "Running",
+      "Stopped",
+      "Faulted",
+      "Under Maintenance"
+    ],
+    "workOrders": [
+      "Open",
+      "In Progress",
+      "Closed"
+    ]
+  },
+  "priorities": [
+    "Low",
+    "Medium",
+    "High"
+  ],
+  "criticality": [
+    "Low",
+    "Medium",
+    "High"
+  ]
+}
